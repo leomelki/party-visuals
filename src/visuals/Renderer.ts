@@ -16,8 +16,8 @@ export interface RenderState {
 
 const UNIFORM_NAMES = [
   'u_res', 'u_time', 'u_level', 'u_sub', 'u_bass', 'u_lowMid', 'u_mid',
-  'u_highMid', 'u_treble', 'u_beat', 'u_flux', 'u_hue', 'u_travel', 'u_spin',
-  'u_spectrum',
+  'u_highMid', 'u_treble', 'u_beat', 'u_impact', 'u_bassPunch', 'u_beatAge',
+  'u_flux', 'u_hue', 'u_travel', 'u_spin', 'u_spectrum',
 ] as const
 
 type UniformMap = Partial<Record<(typeof UNIFORM_NAMES)[number], WebGLUniformLocation | null>>
@@ -137,6 +137,9 @@ export class Renderer {
     if (u.u_highMid != null) gl.uniform1f(u.u_highMid, b.highMid)
     if (u.u_treble != null) gl.uniform1f(u.u_treble, b.treble)
     if (u.u_beat != null) gl.uniform1f(u.u_beat, features.beatEnergy)
+    if (u.u_impact != null) gl.uniform1f(u.u_impact, features.impact)
+    if (u.u_bassPunch != null) gl.uniform1f(u.u_bassPunch, features.bassPunch)
+    if (u.u_beatAge != null) gl.uniform1f(u.u_beatAge, features.beatAge)
     if (u.u_flux != null) gl.uniform1f(u.u_flux, features.flux)
     if (u.u_hue != null) gl.uniform1f(u.u_hue, state.hue)
     if (u.u_travel != null) gl.uniform1f(u.u_travel, state.travel)

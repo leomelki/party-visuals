@@ -146,8 +146,10 @@ export class Visualizer {
   private advanceMotion(dt: number, f: AudioFeatures): void {
     const s = this.state
     s.time += dt
-    s.travel += dt * (0.25 + f.bands.bass * 2.2 + f.beatEnergy * 1.5)
-    s.spin += dt * (0.15 + (f.bands.mid + f.bands.highMid) * 0.9)
+    // Forward motion lurches on every kick (impact) and surges with the bass
+    // envelope, so the tunnel/warp physically jump on the beat.
+    s.travel += dt * (0.25 + f.bassPunch * 3.2 + f.impact * 3.5)
+    s.spin += dt * (0.15 + (f.bands.mid + f.bands.highMid) * 1.1 + f.impact * 0.6)
     // Hue drifts continuously and kicks forward on every beat for colour pops.
     s.hue = (s.hue + dt * 0.03 + (f.beat ? 0.04 : 0)) % 1
   }

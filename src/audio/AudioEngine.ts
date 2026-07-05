@@ -18,6 +18,9 @@ export interface AudioFeatures {
   beat: boolean // a kick/beat landed on this frame
   beatStrength: number // how far above the local average the beat was
   beatEnergy: number // smooth decaying pulse 0..1 (great for visuals)
+  impact: number // sharp elastic 0..1 pop on every beat (for zoom/flash punch)
+  bassPunch: number // fast-attack/slow-release bass envelope 0..1 (pumps)
+  beatAge: number // seconds since the last beat (drives expanding shockwaves)
   bpm: number // running tempo estimate
   flux: number // spectral flux, auto-gained 0..1 (transient energy)
   onset: boolean // a broadband transient (hat/clap) landed this frame
@@ -75,6 +78,8 @@ export class AudioEngine {
   // Beat detector state.
   private bassHistory: number[] = []
   private beatEnergy = 0
+  private impact = 0
+  private bassPunch = 0
   private lastBeatTime = 0
   private beatIntervals: number[] = []
   private bpm = 0
@@ -226,6 +231,17 @@ export class AudioEngine {
     // Smooth decaying pulse — the workhorse for driving visual flashes.
     this.beatEnergy = Math.max(this.beatEnergy * 0.9, beat ? Math.max(0.6, beatStrength) : 0)
 
+    // Impact: a normalised, sharp elastic pop that fires to full on every beat
+    // regardless of strength, then snaps back — great for zoom/flash punches.
+    this.impact = Math.max(this.impact * 0.86, beat ? 1 : 0)
+
+    // BassPunch: instant attack, slow release. Sits high while the low end is
+    // driving and eases down in the gaps, so shapes visibly "pump" with the bass.
+    const bassNow = Math.max(bands.sub, bands.bass)
+    this.bassPunch = bassNow > this.bassPunch ? bassNow : this.bassPunch * 0.9
+
+    const beatAge = Math.min(4, (now - this.lastBeatTime) / 1000)
+
     // --- Log-scaled spectrum for the shaders ---
     for (let i = 0; i < SPECTRUM_BINS; i++) {
       const bins = this.spectrumBinMap[i]
@@ -241,6 +257,9 @@ export class AudioEngine {
       beat,
       beatStrength,
       beatEnergy: this.beatEnergy,
+      impact: this.impact,
+      bassPunch: this.bassPunch,
+      beatAge,
       bpm: this.bpm,
       flux: fluxNorm,
       onset,
