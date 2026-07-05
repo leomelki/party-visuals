@@ -17,7 +17,7 @@ export interface RenderState {
 const UNIFORM_NAMES = [
   'u_res', 'u_time', 'u_level', 'u_sub', 'u_bass', 'u_lowMid', 'u_mid',
   'u_highMid', 'u_treble', 'u_beat', 'u_impact', 'u_bassPunch', 'u_beatAge',
-  'u_flux', 'u_hue', 'u_travel', 'u_spin', 'u_spectrum',
+  'u_flux', 'u_hue', 'u_travel', 'u_spin', 'u_spectrum', 'u_wave',
 ] as const
 
 type UniformMap = Partial<Record<(typeof UNIFORM_NAMES)[number], WebGLUniformLocation | null>>
@@ -31,6 +31,7 @@ export class Renderer {
   private gl: WebGL2RenderingContext
   private vao: WebGLVertexArrayObject
   private spectrumTex: WebGLTexture
+  private waveTex: WebGLTexture
   private vertexShader: WebGLShader
   private programs = new Map<string, CompiledScene>()
 
@@ -48,14 +49,22 @@ export class Renderer {
     // Empty VAO — the fullscreen triangle is generated from gl_VertexID.
     this.vao = gl.createVertexArray()!
 
-    this.spectrumTex = gl.createTexture()!
-    gl.bindTexture(gl.TEXTURE_2D, this.spectrumTex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 128, 1, 0, gl.RED, gl.UNSIGNED_BYTE, null)
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    this.spectrumTex = this.createDataTexture(128)
+    this.waveTex = this.createDataTexture(256)
+  }
+
+  // A width x1 single-channel (R8) texture we stream audio data into each frame.
+  private createDataTexture(width: number): WebGLTexture {
+    const gl = this.gl
+    const tex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, 1, 0, gl.RED, gl.UNSIGNED_BYTE, null)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    return tex
   }
 
   private compileShader(type: number, src: string): WebGLShader {
@@ -126,6 +135,11 @@ export class Renderer {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 1, gl.RED, gl.UNSIGNED_BYTE, features.spectrum)
     if (u.u_spectrum != null) gl.uniform1i(u.u_spectrum, 0)
 
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, this.waveTex)
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RED, gl.UNSIGNED_BYTE, features.waveform)
+    if (u.u_wave != null) gl.uniform1i(u.u_wave, 1)
+
     const b = features.bands
     if (u.u_res != null) gl.uniform2f(u.u_res, canvas.width, canvas.height)
     if (u.u_time != null) gl.uniform1f(u.u_time, state.time)
@@ -153,6 +167,7 @@ export class Renderer {
     for (const { program } of this.programs.values()) gl.deleteProgram(program)
     this.programs.clear()
     gl.deleteTexture(this.spectrumTex)
+    gl.deleteTexture(this.waveTex)
     gl.deleteShader(this.vertexShader)
   }
 }

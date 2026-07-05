@@ -31,6 +31,7 @@ uniform float u_hue;       // slowly rotating base hue 0..1
 uniform float u_travel;    // ever-increasing "forward" distance (bass-driven)
 uniform float u_spin;      // ever-increasing rotation (mid-driven)
 uniform sampler2D u_spectrum; // 128x1 log spectrum, value in .r
+uniform sampler2D u_wave;     // 256x1 time-domain waveform, value in .r
 
 out vec4 fragColor;
 
@@ -59,6 +60,32 @@ vec2 uvCentered() {
 
 float spectrumAt(float x) {
   return texture(u_spectrum, vec2(clamp(x, 0.0, 1.0), 0.5)).r;
+}
+
+// Waveform sample in [-1, 1] (the texture stores it centred at 0.5).
+float waveAt(float x) {
+  return texture(u_wave, vec2(clamp(x, 0.0, 1.0), 0.5)).r * 2.0 - 1.0;
+}
+
+// Smooth value noise + fractal Brownian motion, for organic flowing scenes.
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float fbm(vec2 p) {
+  float s = 0.0, amp = 0.5;
+  for (int i = 0; i < 5; i++) {
+    s += amp * vnoise(p);
+    p *= 2.02;
+    amp *= 0.5;
+  }
+  return s;
 }
 
 // A bright ring that expands from the centre on every beat and fades out — the
@@ -297,13 +324,139 @@ void main() {
 }`,
 }
 
+const WAVEFORM: SceneDef = {
+  id: 'waveform',
+  name: 'Waveform',
+  body: /* glsl */ `
+void main() {
+  vec2 uv = uvCentered();
+  float wx = gl_FragCoord.x / u_res.x;         // 0..1 across the screen
+  float amp = 0.30 + u_bassPunch * 0.30;
+  vec3 col = vec3(0.0);
+  // Three stacked traces of the live waveform make a rich neon ribbon.
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float w = waveAt(fract(wx + fk * 0.015));
+    float y = w * amp * (1.0 - fk * 0.28);
+    float d = abs(uv.y - y);
+    float glow = (0.006 + u_impact * 0.02) / (d + 0.0016);
+    float hue = fract(u_hue + wx * 0.35 + fk * 0.12 + abs(w) * 0.15);
+    col += hsv2rgb(vec3(hue, 0.85, 1.0)) * glow * (1.0 - fk * 0.3);
+  }
+  // Soft mirrored reflection below the axis.
+  float wm = waveAt(wx);
+  col += hsv2rgb(vec3(fract(u_hue + 0.5), 0.7, 1.0)) * (0.004 / (abs(uv.y + wm * amp) + 0.004)) * 0.5;
+  // Faint spectrum silhouette in the background for body.
+  float bar = spectrumAt(wx);
+  col += hsv2rgb(vec3(fract(u_hue + wx * 0.3), 0.6, 1.0)) * step(abs(uv.y), bar * 0.5) * 0.06;
+  col += u_impact * 0.15;
+  fragColor = vec4(bloom(col, u_impact * 0.5), 1.0);
+}`,
+}
+
+const AURORA: SceneDef = {
+  id: 'aurora',
+  name: 'Aurora Flow',
+  body: /* glsl */ `
+void main() {
+  vec2 uv = uvCentered();
+  vec2 p = uv * 2.0;
+  float t = u_time * 0.15;
+  // Domain warp: feed noise back into itself for that liquid, flowing look.
+  vec2 q = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(5.2, 1.3) - t));
+  float warp = 1.0 + u_bassPunch * 2.6;
+  vec2 r = p + warp * q + vec2(1.7 * sin(t), 1.9 * cos(t * 0.8));
+  float f = fbm(r * 1.5 + t);
+  f += 0.3 * fbm(r * 6.0 - t * 2.0) * (0.3 + u_treble * 1.6); // treble shimmer
+  float curtain = smoothstep(0.15, 0.95, f);
+  float hue = fract(u_hue + f * 0.5 + q.x * 0.2);
+  vec3 col = hsv2rgb(vec3(hue, 0.75, 1.0)) * curtain;
+  col *= 0.5 + u_level * 1.3;
+  col += hsv2rgb(vec3(fract(u_hue + 0.4), 0.6, 1.0)) * pow(curtain, 3.0) * (0.3 + u_impact);
+  fragColor = vec4(bloom(col, u_impact * 0.5 + u_bassPunch * 0.3), 1.0);
+}`,
+}
+
+const METABALLS: SceneDef = {
+  id: 'metaballs',
+  name: 'Liquid Orbs',
+  body: /* glsl */ `
+void main() {
+  vec2 uv = uvCentered();
+  float field = 0.0;
+  vec3 acc = vec3(0.0);
+  const int N = 7;
+  for (int i = 0; i < N; i++) {
+    float fi = float(i);
+    float sp = 0.3 + fi * 0.13;
+    float orbit = 0.34 + 0.15 * sin(u_time * 0.5 + fi) + u_impact * 0.22;
+    vec2 c = vec2(cos(u_time * sp + fi * 2.4), sin(u_time * (sp * 0.9) + fi * 1.7)) * orbit;
+    float rad = 0.10 + 0.05 * sin(u_time + fi) + u_bassPunch * 0.11;
+    float f = rad * rad / (dot(uv - c, uv - c) + 0.0005);
+    field += f;
+    acc += hsv2rgb(vec3(fract(u_hue + fi * 0.13), 0.85, 1.0)) * f;
+  }
+  vec3 pal = acc / max(field, 0.001);
+  float surf = smoothstep(0.8, 1.4, field);           // gooey body
+  float edge = exp(-abs(field - 1.0) * 4.0);           // bright membrane
+  vec3 col = pal * (surf * (0.6 + u_treble) + edge * 1.5);
+  col += pal * field * 0.05;                            // soft interior glow
+  col += u_impact * 0.2 * pal;
+  fragColor = vec4(bloom(col, u_impact * 0.5), 1.0);
+}`,
+}
+
+const LATTICE: SceneDef = {
+  id: 'lattice',
+  name: 'Neon Lattice',
+  body: /* glsl */ `
+// Distance to an infinite repeated lattice of axis-aligned neon tubes.
+float sdLattice(vec3 p) {
+  p = fract(p) - 0.5;
+  float dx = length(p.yz);
+  float dy = length(p.xz);
+  float dz = length(p.xy);
+  return min(dx, min(dy, dz)) - 0.05;
+}
+
+void main() {
+  vec2 uv = uvCentered();
+  vec3 ro = vec3(0.0, 0.0, u_travel * 0.5);
+  vec3 rd = normalize(vec3(uv, 1.0));
+  // Fly and bank the camera with the music.
+  vec2 xy = rot(u_spin * 0.08) * rd.xy; rd = vec3(xy, rd.z);
+  vec2 yz = rot(sin(u_time * 0.1) * 0.3) * rd.yz; rd = vec3(rd.x, yz);
+
+  vec3 col = vec3(0.0);
+  float t = 0.0;
+  // Glow-accumulation march: we sum emissive neon rather than shade a surface,
+  // so the lattice reads as volumetric light with real depth.
+  for (int i = 0; i < 56; i++) {
+    vec3 p = ro + rd * t;
+    float d = sdLattice(p);
+    float g = 0.018 / (0.008 + d * d);
+    col += hsv2rgb(vec3(fract(u_hue + p.z * 0.04), 0.7, 1.0)) * g;
+    t += max(0.02, d * 0.75);
+    if (t > 13.0) break;
+  }
+  col *= 0.02 * (1.0 + u_bassPunch * 1.8);
+  col += u_impact * 0.3;
+  fragColor = vec4(bloom(col, u_impact * 0.5), 1.0);
+}`,
+}
+
+// Ordered for variety — flavours alternate rather than clustering.
 export const SCENES: SceneDef[] = [
   TUNNEL,
   WARP,
-  KALEIDOSCOPE,
+  AURORA,
   PLASMA,
+  METABALLS,
+  KALEIDOSCOPE,
   SPECTRUM,
+  WAVEFORM,
   FRACTAL,
+  LATTICE,
   GRID,
 ]
 

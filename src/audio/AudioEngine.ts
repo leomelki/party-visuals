@@ -25,6 +25,7 @@ export interface AudioFeatures {
   flux: number // spectral flux, auto-gained 0..1 (transient energy)
   onset: boolean // a broadband transient (hat/clap) landed this frame
   spectrum: Uint8Array // 128-bin log-scaled spectrum for the shaders (0..255)
+  waveform: Uint8Array // 256 time-domain samples (0..255, centred at 128)
 }
 
 export interface AudioEngineConfig {
@@ -43,6 +44,7 @@ const BAND_EDGES_HZ: Array<[keyof AudioBands, number, number]> = [
 
 const HISTORY = 60 // ~1s of frames for the beat detector's local window
 const SPECTRUM_BINS = 128
+const WAVE_BINS = 256 // time-domain samples exposed to the oscilloscope scene
 
 // A one-pole envelope that tracks a running maximum with slow decay. Dividing a
 // signal by its envelope gives us cheap, smooth auto-gain.
@@ -68,6 +70,7 @@ export class AudioEngine {
   private stream: MediaStream | null = null
   private freq = new Uint8Array(0) // raw byte spectrum
   private prevFreq = new Float32Array(0) // previous frame, for spectral flux
+  private wave = new Uint8Array(0) // raw byte time-domain waveform
   private binHz = 0
 
   // Auto-gain followers.
@@ -85,6 +88,7 @@ export class AudioEngine {
   private bpm = 0
 
   private spectrum = new Uint8Array(SPECTRUM_BINS)
+  private waveform = new Uint8Array(WAVE_BINS)
   private spectrumBinMap: number[][] = []
 
   constructor() {
@@ -122,6 +126,7 @@ export class AudioEngine {
     this.binHz = ctx.sampleRate / analyser.fftSize
     this.freq = new Uint8Array(analyser.frequencyBinCount)
     this.prevFreq = new Float32Array(analyser.frequencyBinCount)
+    this.wave = new Uint8Array(analyser.fftSize)
     this.buildSpectrumMap(analyser.frequencyBinCount)
   }
 
@@ -164,6 +169,7 @@ export class AudioEngine {
     const analyser = this.analyser
     if (!analyser) return null
     analyser.getByteFrequencyData(this.freq)
+    analyser.getByteTimeDomainData(this.wave)
 
     const sens = this.config.sensitivity
 
@@ -251,6 +257,12 @@ export class AudioEngine {
       this.spectrum[i] = Math.min(255, m * (1 + i / SPECTRUM_BINS))
     }
 
+    // --- Downsampled waveform for the oscilloscope scene ---
+    const waveStep = Math.max(1, Math.floor(this.wave.length / WAVE_BINS))
+    for (let i = 0; i < WAVE_BINS; i++) {
+      this.waveform[i] = this.wave[i * waveStep]
+    }
+
     return {
       level,
       bands,
@@ -264,6 +276,7 @@ export class AudioEngine {
       flux: fluxNorm,
       onset,
       spectrum: this.spectrum,
+      waveform: this.waveform,
     }
   }
 }

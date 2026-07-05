@@ -139,7 +139,7 @@ function App() {
             ▶ START
           </button>
           <p className="shortcuts">
-            Space / → next scene · 1–7 pick · F fullscreen · S strobe · A auto · H hide panel
+            Space / → next scene · 1–9 pick · F fullscreen · S strobe · A auto · H hide panel
           </p>
         </div>
       )}

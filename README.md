@@ -42,12 +42,16 @@ silence and surges on drops. A live 128-bin log-scaled spectrum is uploaded as a
 texture for the spectrum-based scenes.
 
 1. **Neon Tunnel** — flight through a glowing tunnel; speed follows the bass.
-2. **Hyperspace** — warp-speed starfield that accelerates on the kick.
-3. **Kaleidoscope** — mirrored fractal folds that breathe with the bass.
+2. **Hyperspace** — warp-speed starfield; stars stretch into streaks on the kick.
+3. **Aurora Flow** — domain-warped fractal noise, flowing liquid curtains of light.
 4. **Liquid Plasma** — flowing plasma field, distorted by low end, flashed by beats.
-5. **Radial Spectrum** — the live spectrum drawn as a mirrored radial bar burst.
-6. **Julia Bloom** — an animated Julia fractal that zoom-pulses on every beat.
-7. **Synthwave Grid** — scrolling perspective grid + spectrum sun.
+5. **Liquid Orbs** — gooey metaballs that swell with the bass and jump on the beat.
+6. **Kaleidoscope** — mirrored fractal folds that breathe with the bass.
+7. **Radial Spectrum** — the live spectrum drawn as a mirrored radial bar burst.
+8. **Waveform** — the actual audio waveform as a glowing neon oscilloscope ribbon.
+9. **Julia Bloom** — an animated Julia fractal that zoom-pulses on every beat.
+10. **Neon Lattice** — a raymarched 3D grid of glowing tubes you fly through.
+11. **Synthwave Grid** — scrolling perspective grid + spectrum sun.
 
 A full-screen **stroboscope** overlay flashes white on beats/onsets (toggle and
 intensity in the panel).
@@ -61,7 +65,7 @@ bring it back). Keyboard:
 | --- | --- |
 | `Space` / `→` | Next scene |
 | `←` | Previous scene |
-| `1`–`7` | Jump to a scene |
+| `1`–`9` | Jump to a scene |
 | `F` | Toggle fullscreen |
 | `S` | Toggle strobe |
 | `A` | Toggle auto scene-switching (rotates every N beats) |

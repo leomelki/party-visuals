@@ -29,7 +29,7 @@ Then press **`F`** for fullscreen and turn up the music. 🎉
   on Windows) and select it as the input.
 - **Nothing reacting?** Make sure music is actually playing and the mic isn't muted.
   Nudge the **Sensitivity** slider up in the panel.
-- **Keyboard:** `Space`/`→` next scene · `1`–`7` pick a scene · `F` fullscreen ·
+- **Keyboard:** `Space`/`→` next scene · `1`–`9` pick a scene · `F` fullscreen ·
   `S` strobe · `A` auto-rotate scenes · `H` hide the panel.
 
 ⚠️ **Photosensitivity warning:** this app produces rapid flashing and strobe
